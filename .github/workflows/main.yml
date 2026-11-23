@@ -95,6 +95,19 @@ jobs:
           chmod +x tools/android/*.sh
           JOBS=$(nproc) tools/android/build_sdk.sh all
 
+      - name: Fetch plume
+        run: |
+          if [ -d "rexglue-sdk/thirdparty/plume" ]; then
+            mkdir -p thirdparty
+            cp -r rexglue-sdk/thirdparty/plume thirdparty/plume
+          else
+            U5=$(printf '%s://%s/%s/%s' 'https' 'github.com' 'renderbag' 'plume.git')
+            git clone --recursive "$U5" thirdparty/plume
+            if [ -f plume-gtav.patch ]; then
+              git -C thirdparty/plume apply "$PWD/plume-gtav.patch" || true
+            fi
+          fi
+          ls thirdparty/plume | head
       - name: Build Android Shell (GTAV_GAME_DLL=ON)
         run: |
           source ~/android-tools/env.sh
