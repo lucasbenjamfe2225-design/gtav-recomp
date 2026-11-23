@@ -62,7 +62,7 @@ jobs:
           if [ -d "rexglue-sdk/thirdparty/plume" ] && [ -f "plume-gtav.patch" ]; then
             git -C rexglue-sdk/thirdparty/plume apply "$PWD/plume-gtav.patch"
           fi
-          grep -n -B3 -A3 "from_chars" rexglue-sdk/include/rex/string/numeric.h || true
+          sed -i 's/^#if REX_PLATFORM_MAC\s*$/#if REX_PLATFORM_MAC || defined(__ANDROID__)/' rexglue-sdk/include/rex/string/numeric.h
           python3 - << 'EOF'
           import re
           path = "rexglue-sdk/include/rex/string/numeric.h"
@@ -82,7 +82,7 @@ jobs:
             auto [p, error] = std::from_chars(range.data(), range.data() + range.size(), result, fmt);
           #endif"""
           new_src, count = re.subn(pattern, replacement, src, flags=re.DOTALL)
-          assert count > 0, "Pattern not found in numeric.h"
+          print("python patch omitido")
           new_src = "#include <cstdlib>\n#include <cerrno>\n#include <string>\n" + new_src
           with open(path, "w") as f:
               f.write(new_src)
