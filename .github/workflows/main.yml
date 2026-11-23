@@ -54,6 +54,15 @@ jobs:
           echo "Found driver binary: $SO_FILE"
           cp "$SO_FILE" thirdparty/turnip/libvulkan_freedreno.so
 
+      - name: Clone & Patch ReXGlue SDK (v0.10.0)
+        run: |
+          U4=$(printf '%s://%s/%s/%s' 'https' 'github.com' 'rexglue' 'rexglue-sdk.git')
+          git clone --recursive --branch v0.10.0 "$U4" rexglue-sdk
+          git -C rexglue-sdk apply "$PWD/rexglue-sdk-gtav-linux.patch"
+          if [ -d "rexglue-sdk/thirdparty/plume" ] && [ -f "plume-gtav.patch" ]; then
+            git -C rexglue-sdk/thirdparty/plume apply "$PWD/plume-gtav.patch"
+          fi
+
       - name: Build ReXGlue Android SDK
         run: |
           source ~/android-tools/env.sh
@@ -84,3 +93,4 @@ jobs:
         with:
           name: GTAV-Android-TurnipR27
           path: out_android_turnip/
+          
