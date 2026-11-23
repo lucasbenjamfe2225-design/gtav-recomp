@@ -62,6 +62,28 @@ jobs:
           if [ -d "rexglue-sdk/thirdparty/plume" ] && [ -f "plume-gtav.patch" ]; then
             git -C rexglue-sdk/thirdparty/plume apply "$PWD/plume-gtav.patch"
           fi
+          python3 - << 'EOF'
+          path = "rexglue-sdk/include/rex/string/numeric.h"
+          with open(path, "r") as f:
+              src = f.read()
+          old = "auto [p, error] = std::from_chars(range.data(), range.data() + range.size(), result, fmt);"
+          new = """#if defined(__ANDROID__)
+            (void)fmt;
+            std::string tmp_str(range.data(), range.size());
+            char* endptr = nullptr;
+            errno = 0;
+            double parsed_val = std::strtod(tmp_str.c_str(), &endptr);
+            const char* p = range.data() + (endptr - tmp_str.c_str());
+            std::errc error = (endptr == tmp_str.c_str()) ? std::errc::invalid_argument : ((errno == ERANGE) ? std::errc::result_out_of_range : std::errc{});
+            if (error == std::errc{}) result = static_cast<T>(parsed_val);
+          #else
+            auto [p, error] = std::from_chars(range.data(), range.data() + range.size(), result, fmt);
+          #endif"""
+          assert old in src, "Pattern not found in numeric.h"
+          src = "#include <cstdlib>\n#include <cerrno>\n#include <string>\n" + src.replace(old, new)
+          with open(path, "w") as f:
+              f.write(src)
+          EOF
 
       - name: Build ReXGlue Android SDK
         run: |
@@ -93,4 +115,3 @@ jobs:
         with:
           name: GTAV-Android-TurnipR27
           path: out_android_turnip/
-          
