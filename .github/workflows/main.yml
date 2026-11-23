@@ -1,0 +1,86 @@
+name: Build GTAV Android APK (Turnip R27)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout gtav-recomp
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build cmake unzip zip curl python3 openjdk-17-jdk rsync
+
+      - name: Setup Android SDK & NDK
+        run: |
+          mkdir -p ~/android-tools/sdk/cmdline-tools
+          CMD_ZIP="commandlinetools-linux-11076708_latest.zip"
+          U1=$(printf '%s://%s.%s/%s/%s' 'https' 'dl' 'google.com' 'android/repository' "$CMD_ZIP")
+          curl -fSL "$U1" -o cmdtools.zip
+          unzip -q cmdtools.zip -d ~/android-tools/sdk/cmdline-tools
+          mv ~/android-tools/sdk/cmdline-tools/cmdline-tools ~/android-tools/sdk/cmdline-tools/latest
+          yes | ~/android-tools/sdk/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null || true
+          ~/android-tools/sdk/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;27.2.12479018"
+          cat << 'EOF' > ~/android-tools/env.sh
+          export ANDROID_HOME=$HOME/android-tools/sdk
+          export ANDROID_NDK_HOME=$HOME/android-tools/sdk/ndk/27.2.12479018
+          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/build-tools/36.0.0:$PATH
+          EOF
+
+      - name: Build libadrenotools (arm64-v8a)
+        run: |
+          source ~/android-tools/env.sh
+          U2=$(printf '%s://%s/%s/%s' 'https' 'github.com' 'bylaws' 'libadrenotools.git')
+          git clone --recursive "$U2" thirdparty/libadrenotools
+          cmake -S thirdparty/libadrenotools -B thirdparty/libadrenotools/build -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-30 \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build thirdparty/libadrenotools/build -j$(nproc)
+
+      - name: Download Turnip R27 Adreno 650 Driver
+        run: |
+          mkdir -p thirdparty/turnip
+          U3=$(printf '%s://%s/%s/%s/%s' 'https' 'github.com' 'lucasbenjamfe2225-design/Adreno-Tools-Drivers' 'releases/latest/download' 'Turnip_R27_Adreno650_Opt.zip')
+          curl -fSL "$U3" -o turnip.zip
+          unzip -q turnip.zip -d thirdparty/turnip_raw
+          SO_FILE=$(find thirdparty/turnip_raw -name "*.so" | head -n 1)
+          echo "Found driver binary: $SO_FILE"
+          cp "$SO_FILE" thirdparty/turnip/libvulkan_freedreno.so
+
+      - name: Build ReXGlue Android SDK
+        run: |
+          source ~/android-tools/env.sh
+          chmod +x tools/android/*.sh
+          JOBS=$(nproc) tools/android/build_sdk.sh all
+
+      - name: Build Android Shell (GTAV_GAME_DLL=ON)
+        run: |
+          source ~/android-tools/env.sh
+          cmake -S gtav -B build/android-dll -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-30 -DANDROID_STL=c++_shared \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DGTAV_GAME_DLL=ON \
+            -DCMAKE_FIND_ROOT_PATH="$PWD/rexglue-sdk/out/install/android-arm64" \
+            -Drexglue_DIR="$PWD/rexglue-sdk/out/install/android-arm64/lib/cmake/rexglue" \
+            -DSDL3_DIR="$PWD/rexglue-sdk/out/install/android-arm64/lib/cmake/SDL3" \
+            -DCMAKE_FIND_PACKAGE_NO_PACKAGE_REGISTRY=ON
+          cmake --build build/android-dll -j$(nproc)
+
+      - name: Package Release APK & Android Shell
+        run: |
+          source ~/android-tools/env.sh
+          tools/android/make_shell.sh out_android_turnip
+
+      - name: Upload GTAV Turnip R27 Release Package
+        uses: actions/upload-artifact@v4
+        with:
+          name: GTAV-Android-TurnipR27
+          path: out_android_turnip/
