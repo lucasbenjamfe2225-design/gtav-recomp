@@ -63,11 +63,12 @@ jobs:
             git -C rexglue-sdk/thirdparty/plume apply "$PWD/plume-gtav.patch"
           fi
           python3 - << 'EOF'
+          import re
           path = "rexglue-sdk/include/rex/string/numeric.h"
           with open(path, "r") as f:
               src = f.read()
-          old = "auto [p, error] = std::from_chars(range.data(), range.data() + range.size(), result, fmt);"
-          new = """#if defined(__ANDROID__)
+          pattern = r"auto\s*\[p,\s*error\]\s*=\s*std::from_chars\([^;]+?result\s*,\s*fmt\s*\);"
+          replacement = """#if defined(__ANDROID__)
             (void)fmt;
             std::string tmp_str(range.data(), range.size());
             char* endptr = nullptr;
@@ -79,10 +80,12 @@ jobs:
           #else
             auto [p, error] = std::from_chars(range.data(), range.data() + range.size(), result, fmt);
           #endif"""
-          assert old in src, "Pattern not found in numeric.h"
-          src = "#include <cstdlib>\n#include <cerrno>\n#include <string>\n" + src.replace(old, new)
+          new_src, count = re.subn(pattern, replacement, src, flags=re.DOTALL)
+          assert count > 0, "Pattern not found in numeric.h"
+          new_src = "#include <cstdlib>\n#include <cerrno>\n#include <string>\n" + new_src
           with open(path, "w") as f:
-              f.write(src)
+              f.write(new_src)
+          print(f"Patched {count} occurrence(s) in numeric.h")
           EOF
 
       - name: Build ReXGlue Android SDK
@@ -115,3 +118,4 @@ jobs:
         with:
           name: GTAV-Android-TurnipR27
           path: out_android_turnip/
+          
