@@ -39,8 +39,19 @@ fi
 "$BT/aapt2" link -o base.apk --manifest "$MANIFEST" -I "$JAR" \
   --min-sdk-version 30 --target-sdk-version 34
 
+ADRENO_DIR="$ROOT/thirdparty/libadrenotools"
+TURNIP_SO="$ROOT/thirdparty/turnip/libvulkan_freedreno.so"
+CLANGXX="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android30-clang++"
+
+"$CLANGXX" -O3 -march=armv8.2-a+dotprod+fp16 -mtune=cortex-a77 -shared -fPIC \
+  -I"$ADRENO_DIR/include" \
+  "$ROOT/tools/android/turnip_loader/turnip_loader.cpp" \
+  -L"$ADRENO_DIR/build" -ladrenotools -llog -ldl \
+  -o stage/lib/arm64-v8a/libturnip_loader.so
+
 cp "${LIBS[@]}" "$SDK_LIB/librexruntime.so" "$SDK_LIB/librexgpu-xenos.so" \
-   "$NDK_LIBCXX" stage/lib/arm64-v8a/
+   "$NDK_LIBCXX" "$ADRENO_DIR/build/libadrenotools.so" "$TURNIP_SO" \
+   stage/lib/arm64-v8a/
 "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" --strip-debug stage/lib/arm64-v8a/*.so
 cp base.apk unaligned.apk
 (cd stage && zip -q -X ../unaligned.apk classes.dex && zip -q -X -0 -r ../unaligned.apk lib)
