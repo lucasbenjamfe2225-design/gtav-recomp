@@ -62,6 +62,7 @@ jobs:
           if [ -d "rexglue-sdk/thirdparty/plume" ] && [ -f "plume-gtav.patch" ]; then
             git -C rexglue-sdk/thirdparty/plume apply "$PWD/plume-gtav.patch"
           fi
+          grep -n -B3 -A3 "from_chars" rexglue-sdk/include/rex/string/numeric.h || true
           python3 - << 'EOF'
           import re
           path = "rexglue-sdk/include/rex/string/numeric.h"
