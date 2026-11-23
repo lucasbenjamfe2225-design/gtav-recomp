@@ -14,7 +14,7 @@ if [ "$step" = configure ] || [ "$step" = all ]; then
     -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
     -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-30 -DANDROID_STL=c++_shared \
     -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=23 \
-    -DCMAKE_C_FLAGS="-march=armv8.2-a+lse+rcpc+dotprod" -DCMAKE_CXX_FLAGS="-march=armv8.2-a+lse+rcpc+dotprod -fno-semantic-interposition" \
+    -DCMAKE_C_FLAGS="-march=armv8.2-a+lse+rcpc+dotprod" -DCMAKE_CXX_FLAGS="-march=armv8.2-a+lse+rcpc+dotprod -fno-semantic-interposition -fexperimental-library" \
     -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-Bsymbolic-functions" \
     -DCMAKE_INSTALL_PREFIX="$PREFIX" \
     -DREXGLUE_ENABLE_TRACY=OFF -DREXGLUE_BUILD_TESTS=OFF \
