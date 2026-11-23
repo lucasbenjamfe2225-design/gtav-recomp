@@ -21,19 +21,29 @@ import org.libsdl.app.SDLActivity;
 public class GameActivity extends SDLActivity {
     private static final String TAG = "GtavRecomp";
 
+    private static native boolean nativeInitTurnip(String nativeLibDir, String tempDir);
+    private static native void nativeHookVulkan();
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // SDL picks the orientation from the window it creates (the runtime's is resizable, so
-        // portrait was allowed): the game is landscape only.
         try {
+            System.loadLibrary("adrenotools");
+            System.loadLibrary("turnip_loader");
+            String nativeDir = getApplicationInfo().nativeLibraryDir;
+            File tmpDir = new File(getCacheDir(), "adrenotools_tmp");
+            tmpDir.mkdirs();
+            boolean ok = nativeInitTurnip(nativeDir, tmpDir.getAbsolutePath());
+            Log.i(TAG, "Turnip R27 init: " + ok);
+            if (ok) {
+                android.system.Os.setenv("SDL_VULKAN_LIBRARY", nativeDir + "/libvulkan_freedreno.so", true);
+            }
             android.system.Os.setenv("SDL_ORIENTATIONS", "LandscapeLeft LandscapeRight", true);
-            // No accelerometer-as-joystick and no HIDAPI: both keep SDL's event loop polling (a
-            // whole big core spent in joystick detection); pads come through Android's input events.
             android.system.Os.setenv("SDL_ACCELEROMETER_AS_JOYSTICK", "0", true);
             android.system.Os.setenv("SDL_JOYSTICK_HIDAPI", "0", true);
-        } catch (Exception e) {
-            Log.w(TAG, "setenv: " + e);
+        } catch (Throwable e) {
+            Log.e(TAG, "Turnip R27 setup error: " + e);
         }
+
         // args.txt env: lines before super.onCreate loads libmain.so: its static initializers read
         // some variables (GTAV_NATIVE_FETCH_RESOLVE), and getArguments runs only after the load.
         File extra = new File(getExternalFilesDir(null), "args.txt");
@@ -52,6 +62,11 @@ public class GameActivity extends SDLActivity {
             }
         }
         super.onCreate(savedInstanceState);
+        try {
+            nativeHookVulkan();
+        } catch (Throwable e) {
+            Log.e(TAG, "Turnip hook error: " + e);
+        }
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     }
 
